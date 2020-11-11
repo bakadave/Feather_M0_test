@@ -17,7 +17,7 @@
 #define VBATPIN     A7
 
 // 862 - 890 MHz
-#define RF69_FREQ 868.0
+#define RF69_FREQ 867.6
 
 // Singleton instance of the radio driver
 RH_RF69 rf69(RFM69_CS, RFM69_INT);
@@ -54,7 +54,8 @@ void setup() {
     // ishighpowermodule flag set like this:
     rf69.setTxPower(14, true);  // range from 14-20 for power, 2nd arg must be true for 69HCW
 
-    rf69.mode(OOK_Rb1Bw1);
+    //rf69.setModemRegisters(FSK_Rb38_4Fd76_8);
+    rf69.setModemConfig(RH_RF69::OOK_Rb1Bw1);
     
     // The encryption key has to be the same as the one in the server
     //uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
@@ -64,7 +65,25 @@ void setup() {
     pinMode(LED, OUTPUT);
 
     Serial.print("RFM69 radio @");  Serial.print((int)RF69_FREQ);  Serial.println(" MHz");
-    }
+
+    /*! @brief rtl_433 output
+    *   Guessing modulation: Pulse Width Modulation with multiple packets
+    *   Attempting demodulation... short_width: 1228, long_width: 2484, reset_limit: 5180, sync_width: 0
+    *   Use a flex decoder with -X 'n=name,m=OOK_PWM,s=1228,l=2484,r=5180,g=2552,t=500,y=0'
+    *   pulse_demod_pwm(): Analyzer Device
+    *   bitbuffer:: Number of rows: 6
+    *   [00] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
+    *   [01] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
+    *   [02] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
+    *   [03] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
+    *   [04] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
+    *   [05] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
+    */
+    uint8_t data[4] = {0xFF, 0x9F, 0x3D, 0xC0};
+    rf69.send((uint8_t*)data, 4);
+
+    Serial.println("data sent");
+}
 
 void loop() {
   // put your main code here, to run repeatedly:
@@ -75,7 +94,5 @@ float measureBat() {
     measuredvbat *= 2;    // we divided by 2, so multiply back
     measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
     measuredvbat /= 1024; // convert to voltage
-    //Serial.print("VBat: " ); 
-    //Serial.println(measuredvbat);
     return measuredvbat;
 }

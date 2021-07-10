@@ -71,8 +71,8 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
 
 	/* Initialize registers */
 	rf69.spiWrite(RH_RF69_REG_02_DATAMODUL,     RH_RF69_DATAMODUL_MODULATIONTYPE_OOK);  /* pakcet mode, OOK, no shaping */
-	rf69.spiWrite(RH_RF69_REG_03_BITRATEMSB,    0x7d);
-	rf69.spiWrite(RH_RF69_REG_04_BITRATELSB,    0x00);  /* bit rate - 1000bps */
+	rf69.spiWrite(RH_RF69_REG_03_BITRATEMSB,    0x1f);
+	rf69.spiWrite(RH_RF69_REG_04_BITRATELSB,    0x40);  /* bit rate - 1000bps */
 	rf69.spiWrite(RH_RF69_REG_05_FDEVMSB,       0x01);
 	rf69.spiWrite(RH_RF69_REG_06_FDEVLSB,       0x9a);  /* frequency deviation - 25Khz */
 	rf69.spiWrite(RH_RF69_REG_07_FRFMSB,        0xd9);
@@ -87,9 +87,9 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
 		RH_RF69_REG_2E_SYNCCONFIG,
 		(1 << 7) /* sync on */ | ((sync_len - 1) << 3) /* 6 bytes */ | sync_tol /* error tolerance of 2 */
 	);
-	for (uint16_t i = 0; i < sync_len; i++) {
-		rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1 + i, sync_val[i]);
-	}
+	// for (uint16_t i = 0; i < sync_len; i++) {
+	// 	rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1 + i, sync_val[i]);
+	// }
 
     Serial.println("sync val set");
 

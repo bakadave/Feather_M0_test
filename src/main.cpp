@@ -40,13 +40,12 @@ void setup() {
     }
 
     Serial.println("radio initialised");
-
-    radio.rf69_transmit(MED, sizeof(MED), false);
-    Serial.println("data sent");
 }
 
 void loop() {
-    radio.rf69_transmit(MED, 4, false);
-    Serial.println("data sent");
+    for(int i = 0; i < 3; i++) {
+        radio.rf69_transmit(MED, sizeof(MED), false);
+        Serial.println("data sent");
+    }
     delay(1000);
 }

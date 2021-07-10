@@ -70,26 +70,42 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
     Serial.println("opmode set");
 
 	/* Initialize registers */
-	rf69.spiWrite(RH_RF69_REG_02_DATAMODUL,     RH_RF69_DATAMODUL_MODULATIONTYPE_OOK);  /* pakcet mode, OOK, no shaping */
-	rf69.spiWrite(RH_RF69_REG_03_BITRATEMSB,    0x1f);
-	rf69.spiWrite(RH_RF69_REG_04_BITRATELSB,    0x40);  /* bit rate - 1000bps */
-	rf69.spiWrite(RH_RF69_REG_05_FDEVMSB,       0x01);
-	rf69.spiWrite(RH_RF69_REG_06_FDEVLSB,       0x9a);  /* frequency deviation - 25Khz */
-	rf69.spiWrite(RH_RF69_REG_07_FRFMSB,        0xd9);
-	rf69.spiWrite(RH_RF69_REG_08_FRFMID,        0x06);
-	rf69.spiWrite(RH_RF69_REG_09_FRFLSB,        0x66);  /* Approx 868.1Mhz */
+    //rf69.spiWrite()
+	rf69.spiWrite(RH_RF69_REG_02_DATAMODUL,     RH_RF69_DATAMODUL_MODULATIONTYPE_OOK | RH_RF69_DATAMODUL_MODULATIONSHAPING_OOK_NONE);  /* pakcet mode, OOK, no shaping */
+
+//BITRATE
+    uint32_t bitrate = RH_RF69_FXOSC / 3000;
+	rf69.spiWrite(RH_RF69_REG_03_BITRATEMSB,    bitrate >> 8);
+	rf69.spiWrite(RH_RF69_REG_04_BITRATELSB,    bitrate);
+
+	// rf69.spiWrite(RH_RF69_REG_05_FDEVMSB,       0x01);
+	// rf69.spiWrite(RH_RF69_REG_06_FDEVLSB,       0x9a);  /* frequency deviation - 25Khz */
+
+//FREQUENCY
+    uint32_t freqHz = 868100000;
+    freqHz /= RH_RF69_FSTEP;
+	rf69.spiWrite(RH_RF69_REG_07_FRFMSB,        freqHz >> 16);
+	rf69.spiWrite(RH_RF69_REG_08_FRFMID,        freqHz >> 8);
+	rf69.spiWrite(RH_RF69_REG_09_FRFLSB,        freqHz);
     //rf69.setFrequency(868.1);
-	rf69.spiWrite(RH_RF69_REG_19_RXBW,          0x42);
-	rf69.spiWrite(RH_RF69_REG_37_PACKETCONFIG1, RH_RF69_PACKETCONFIG1_DCFREE_NONE);  /* No packet filtering */
+
+//BANDWIDTH
+    //uint8_t bw = 0x00;
+	//rf69.spiWrite(RH_RF69_REG_19_RXBW,          (rf69.spiRead(RH_RF69_REG_19_RXBW) & 0xE0) | bw);
+
+//THRESHOLD
+    rf69.spiWrite(RH_RF69_REG_1D_OOKFIX,        30);
+
+    rf69.spiWrite(RH_RF69_REG_37_PACKETCONFIG1, RH_RF69_PACKETCONFIG1_DCFREE_NONE);  /* No packet filtering */
 	rf69.spiWrite(RH_RF69_REG_28_IRQFLAGS2,     RH_RF69_IRQFLAGS2_FIFOOVERRUN);  /* Clear FIFO and flags */
 	rf69.spiWrite(RH_RF69_REG_2D_PREAMBLELSB,   0x00);  /* We generate our own preamble */
-	rf69.spiWrite(
-		RH_RF69_REG_2E_SYNCCONFIG,
+
+    rf69.spiWrite(RH_RF69_REG_2E_SYNCCONFIG,
 		(1 << 7) /* sync on */ | ((sync_len - 1) << 3) /* 6 bytes */ | sync_tol /* error tolerance of 2 */
 	);
-	// for (uint16_t i = 0; i < sync_len; i++) {
-	// 	rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1 + i, sync_val[i]);
-	// }
+	for (uint16_t i = 0; i < sync_len; i++) {
+		rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1 + i, sync_val[i]);
+	}
 
     Serial.println("sync val set");
 
@@ -107,24 +123,41 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
 	return true;
 }
 
-bool Radio::rf69_receiveDone(uint8_t *out, uint8_t *sz)
+void Radio::rf69_receiveDone(/*uint8_t *out, uint8_t *sz*/)
 {
-	ATOMIC_BLOCK_START;
-	if (rf69.spiRead(RH_RF69_REG_28_IRQFLAGS2) & 4 /* PayloadReady*/) {
-		size_t max_sz = *sz, b = 0;
+	// ATOMIC_BLOCK_START;
+	// if (rf69.spiRead(RH_RF69_REG_28_IRQFLAGS2) & 4 /* PayloadReady*/) {
+	// 	size_t max_sz = *sz, b = 0;
 
-		/* Read data out of FIFO */
-		while (b < max_sz && rf69.spiRead(RH_RF69_REG_28_IRQFLAGS2) & 0x20 /* fifo not empty */) {
-			out[b++] = rf69.spiRead(RH_RF69_REG_00_FIFO);
-		}
+	// 	/* Read data out of FIFO */
+	// 	while (b < max_sz && rf69.spiRead(RH_RF69_REG_28_IRQFLAGS2) & 0x20 /* fifo not empty */) {
+	// 		out[b++] = rf69.spiRead(RH_RF69_REG_00_FIFO);
+	// 	}
 
-		*sz = b;
-		return true;
-	}
+	// 	*sz = b;
+	// 	return true;
+	// }
 
 
-	ATOMIC_BLOCK_END;
-	return false;
+	// ATOMIC_BLOCK_END;
+	// return false;
+
+    uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
+    uint8_t len = sizeof(buf);
+
+    if (rf69.waitAvailableTimeout(500)) {
+        // Should be a reply message for us now
+        if (rf69.recv(buf, &len)) {
+            Serial.print("got reply: ");
+            Serial.println((char*)buf);
+        }
+        else {
+            Serial.println("recv failed");
+        }
+    }
+    else {
+        Serial.println("No reply, is rf69_server running?");
+    }
 }
 
 void Radio::rf69_transmit(const uint8_t *data, size_t len, bool no_sync)

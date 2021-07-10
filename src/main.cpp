@@ -19,8 +19,10 @@
 #define RF69_FREQ 868.1
 
 //const uint8_t sync_val[] = {0x00};
-const uint8_t sync_val[] = { 0x6c, 0xb6, 0xcb, 0x2c, 0x92, 0xd9 };
-const uint8_t MED[] = {0x22, 0x0f, 0xe2, 0x00};
+//const uint8_t sync_val[] = { 0x6c, 0xb6, 0xcb, 0x2c, 0x92, 0xd9 };
+const uint8_t sync_val[] = {0b11111111};
+//const uint8_t MED[] = {0x22, 0x0f, 0xe2, 0x00};
+const uint8_t MED[] = {0x84,0x3c,0x84,0x21,0xe4,0x21,0x08,0x43,0xcf,0x79,0xe7,0x9e,0x79,0x08,0x43,0xc8};
 #define PACKET_LENGTH
 
 // Singleton instance of the radio driver
@@ -44,8 +46,41 @@ void setup() {
 
 void loop() {
     for(int i = 0; i < 3; i++) {
-        radio.rf69_transmit((uint8_t*)MED, sizeof(MED), false);
+        radio.rf69_transmit((uint8_t*)MED, sizeof(MED), true);
+        delay(50);
     }
     Serial.println("data sent");
-    delay(1000);
+    // delay(1000);
+
+    for(int i = 0; i < 20; i++) {
+        radio.rf69_receiveDone();
+        delay(400);
+    }
+
+    // uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
+    // uint8_t len = sizeof(buf);
+
+    // if (rf69.waitAvailableTimeout(500)) {
+    //     // Should be a reply message for us now
+    //     if (rf69.recv(buf, &len)) {
+    //         Serial.print("got reply: ");
+    //         Serial.println((char*)buf);
+    //     }
+    //     else {
+    //         Serial.println("recv failed");
+    //     }
+    // }
+    // else {
+    //     Serial.println("No reply, is rf69_server running?");
+    // }
+    // delay(400);
+
+    // uint8_t data[30];
+    // uint8_t data_sz = sizeof data;
+
+    // if (radio.rf69_receiveDone(data, &data_sz)) {
+    //     for(int i = 0; i < data_sz; i++) {
+    //         Serial.print(data[i]);
+    //     }
+    // }
 }

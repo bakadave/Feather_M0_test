@@ -18,7 +18,8 @@
 // 862 - 890 MHz
 #define RF69_FREQ 868.1
 
-const uint8_t sync_val[] = {0x00};
+//const uint8_t sync_val[] = {0x00};
+const uint8_t sync_val[] = { 0x6c, 0xb6, 0xcb, 0x2c, 0x92, 0xd9 };
 const uint8_t MED[] = {0x22, 0x0f, 0xe2, 0x00};
 #define PACKET_LENGTH
 
@@ -27,24 +28,20 @@ const uint8_t MED[] = {0x22, 0x0f, 0xe2, 0x00};
 //RH_RF69 rf69(RFM69_CS, RFM69_INT);
 Radio radio(RFM69_CS, RFM69_INT, RFM69_RST);
 
-float measureBat();
-
 void setup() {
     Serial.begin(BAUDRATE);
+    while (!Serial)
+        delay(1); // wait until serial console is open, remove if not tethered to computer
+    Serial.println("serial started");
 
-    if(radio.rf69_init(sizeof(sync_val), 4, sync_val, 2))
+    if(radio.rf69_init(sizeof(sync_val), 27, sync_val, 2))
         Serial.println("radio initialised");
+
+    radio.rf69_transmit(MED, sizeof(MED), false);
+    Serial.println("data sent");
 }
 
 void loop() {
-    radio.rf69_transmit(MED, 4, false);
-    delay(1000);
-}
-
-float measureBat() {
-    float measuredvbat = analogRead(VBATPIN);
-    measuredvbat *= 2;    // we divided by 2, so multiply back
-    measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
-    measuredvbat /= 1024; // convert to voltage
-    return measuredvbat;
+    // radio.rf69_transmit(MED, 4, false);
+    // delay(1000);
 }

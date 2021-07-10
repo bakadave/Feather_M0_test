@@ -17,7 +17,7 @@
 #define VBATPIN     A7
 
 // 862 - 890 MHz
-#define RF69_FREQ 868.1
+#define FREQ 868.1
 
 // Singleton instance of the radio driver
 //
@@ -48,7 +48,7 @@ void setup() {
 
     // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM (for low power module)
     // No encryption
-    if (!rf69.setFrequency(RF69_FREQ))
+    if (!rf69.setFrequency(FREQ))
         Serial.println("setFrequency failed");
 
     // If you are using a high power RF69 eg RFM69HW, you *must* set a Tx power with the
@@ -65,7 +65,7 @@ void setup() {
 
     pinMode(LED, OUTPUT);
 
-    Serial.print("RFM69 radio @");  Serial.print((int)RF69_FREQ);  Serial.println(" MHz");
+    Serial.print("RFM69 radio @");  Serial.print((int)FREQ);  Serial.println(" MHz");
 
     /*! @brief rtl_433 output
     *   Guessing modulation: Pulse Width Modulation with multiple packets

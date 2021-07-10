@@ -17,9 +17,10 @@
 #define VBATPIN     A7
 
 // 862 - 890 MHz
-#define RF69_FREQ 867.6
+#define RF69_FREQ 868.1
 
 // Singleton instance of the radio driver
+//
 RH_RF69 rf69(RFM69_CS, RFM69_INT);
 
 float measureBat();
@@ -29,7 +30,7 @@ void setup() {
     while (!Serial)
         delay(1); // wait until serial console is open, remove if not tethered to computer
 
-    pinMode(LED, OUTPUT);     
+    pinMode(LED, OUTPUT);
     pinMode(RFM69_RST, OUTPUT);
     digitalWrite(RFM69_RST, LOW);
 
@@ -55,13 +56,13 @@ void setup() {
     rf69.setTxPower(14, true);  // range from 14-20 for power, 2nd arg must be true for 69HCW
 
     //rf69.setModemRegisters(FSK_Rb38_4Fd76_8);
-    rf69.setModemConfig(RH_RF69::OOK_Rb1Bw1);
-    
+    rf69.setModemConfig(RH_RF69::OOK_Rb1_2Bw75);
+
     // The encryption key has to be the same as the one in the server
     //uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
     //                    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
     //rf69.setEncryptionKey(key);
-    
+
     pinMode(LED, OUTPUT);
 
     Serial.print("RFM69 radio @");  Serial.print((int)RF69_FREQ);  Serial.println(" MHz");
@@ -86,7 +87,51 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+    if (rf69.waitAvailableTimeout(500)) {
+        // Should be a message for us now
+        uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
+        uint8_t len = sizeof(buf);
+
+        if (rf69.recv(buf, &len)) {
+            Serial.print("got reply: ");
+            Serial.println((char*)buf);
+        }
+        else
+            Serial.println("Receive failed");
+    }
+
+    uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                      0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+    rf69.send((uint8_t*)key, 16);
+    rf69.waitPacketSent();
+    delay(500);
+
+    // if (rf69.available()) {
+    //     // Should be a message for us now
+    //     uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
+    //     uint8_t len = sizeof(buf);
+    //     if (rf69.recv(buf, &len)) {
+    //     if (!len) return;
+    //     buf[len] = 0;
+    //     Serial.print("Received [");
+    //     Serial.print(len);
+    //     Serial.print("]: ");
+    //     Serial.println((char*)buf);
+    //     Serial.print("RSSI: ");
+    //     Serial.println(rf69.lastRssi(), DEC);
+
+    //     if (strstr((char *)buf, "Hello World")) {
+    //         // Send a reply!
+    //         uint8_t data[] = "And hello back to you";
+    //         rf69.send(data, sizeof(data));
+    //         rf69.waitPacketSent();
+    //         Serial.println("Sent a reply");
+    //         //Blink(LED, 40, 3); //blink LED 3 times, 40ms between blinks
+    //     }
+    //     } else {
+    //     Serial.println("Receive failed");
+    //     }
+    // }
 }
 
 float measureBat() {

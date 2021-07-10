@@ -44,8 +44,8 @@ void setup() {
 
 void loop() {
     for(int i = 0; i < 3; i++) {
-        radio.rf69_transmit(MED, sizeof(MED), false);
-        Serial.println("data sent");
+        radio.rf69_transmit((uint8_t*)MED, sizeof(MED), false);
     }
+    Serial.println("data sent");
     delay(1000);
 }

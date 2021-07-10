@@ -26,6 +26,12 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
 	pinMode(pin_rst, OUTPUT);
 	digitalWrite(pin_rst, LOW);
 
+    //sync value of 0x00 is forbidden
+    for(int i = 0; i < sync_len; i++) {
+        if(sync_val[i] == 0x00)
+            return false;
+    }
+
 	if (!rf69.init()) {
 		return false;
 	}
@@ -46,14 +52,15 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
 	rf69.setOpMode(RH_RF69_OPMODE_MODE_STDBY);
 
 	/* Initialize registers */
-	rf69.spiWrite(RH_RF69_REG_02_DATAMODUL,     RH_RF69_DATAMODUL_MODULATIONTYPE_FSK);  /* pakcet mode, FSK, no shaping */
+	rf69.spiWrite(RH_RF69_REG_02_DATAMODUL,     RH_RF69_DATAMODUL_MODULATIONTYPE_OOK);  /* pakcet mode, FSK, no shaping */
 	rf69.spiWrite(RH_RF69_REG_03_BITRATEMSB,    0x7d);
-	rf69.spiWrite(RH_RF69_REG_04_BITRATELSB,    0x00);  /* 1000bps */
+	rf69.spiWrite(RH_RF69_REG_04_BITRATELSB,    0x00);  /* bit rate - 1000bps */
 	rf69.spiWrite(RH_RF69_REG_05_FDEVMSB,       0x01);
-	rf69.spiWrite(RH_RF69_REG_06_FDEVLSB,       0x9a);  /* 25Khz */
-	rf69.spiWrite(RH_RF69_REG_07_FRFMSB,        0x6c);
-	rf69.spiWrite(RH_RF69_REG_08_FRFMID,        0x7a);
-	rf69.spiWrite(RH_RF69_REG_09_FRFLSB,        0xff);  /* Approx 433.9Mhz */
+	rf69.spiWrite(RH_RF69_REG_06_FDEVLSB,       0x9a);  /* frequency deviation - 25Khz */
+	rf69.spiWrite(RH_RF69_REG_07_FRFMSB,        0x37);
+	rf69.spiWrite(RH_RF69_REG_08_FRFMID,        0xe9);
+	rf69.spiWrite(RH_RF69_REG_09_FRFLSB,        0x2e);  /* Approx 868.1Mhz */
+    //rf69.setFrequency(868.1);
 	rf69.spiWrite(RH_RF69_REG_19_RXBW,          0x42);
 	rf69.spiWrite(RH_RF69_REG_37_PACKETCONFIG1, RH_RF69_PACKETCONFIG1_DCFREE_NONE);  /* No packet filtering */
 	rf69.spiWrite(RH_RF69_REG_28_IRQFLAGS2,     RH_RF69_IRQFLAGS2_FIFOOVERRUN);  /* Clear FIFO and flags */

@@ -5,10 +5,9 @@
 *   sniffing example: https://www.embeddedrelated.com/showarticle/626.php
 */
 
-#include <Arduino.h>
-#include <SPI.h>
-#include <RH_RF69.h>
+#include "rf69.h"
 
+#define BAUDRATE 115200
 /* for feather m0  */
 #define RFM69_CS    8
 #define RFM69_INT   3
@@ -19,119 +18,27 @@
 // 862 - 890 MHz
 #define RF69_FREQ 868.1
 
+const uint8_t sync_val[] = {0x00};
+const uint8_t MED[] = {0x22, 0x0f, 0xe2, 0x00};
+#define PACKET_LENGTH
+
 // Singleton instance of the radio driver
 //
-RH_RF69 rf69(RFM69_CS, RFM69_INT);
+//RH_RF69 rf69(RFM69_CS, RFM69_INT);
+Radio radio(RFM69_CS, RFM69_INT, RFM69_RST);
 
 float measureBat();
 
 void setup() {
-    Serial.begin(115200);
-    while (!Serial)
-        delay(1); // wait until serial console is open, remove if not tethered to computer
+    Serial.begin(BAUDRATE);
 
-    pinMode(LED, OUTPUT);
-    pinMode(RFM69_RST, OUTPUT);
-    digitalWrite(RFM69_RST, LOW);
-
-    // manual reset
-    digitalWrite(RFM69_RST, HIGH);
-    delay(10);
-    digitalWrite(RFM69_RST, LOW);
-    delay(10);
-
-    if (!rf69.init()) {
-        Serial.println("RFM69 radio init failed");
-        while (1);
-    }
-    Serial.println("RFM69 radio init OK!");
-
-    // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM (for low power module)
-    // No encryption
-    if (!rf69.setFrequency(RF69_FREQ))
-        Serial.println("setFrequency failed");
-
-    // If you are using a high power RF69 eg RFM69HW, you *must* set a Tx power with the
-    // ishighpowermodule flag set like this:
-    rf69.setTxPower(14, true);  // range from 14-20 for power, 2nd arg must be true for 69HCW
-
-    //rf69.setModemRegisters(FSK_Rb38_4Fd76_8);
-    rf69.setModemConfig(RH_RF69::OOK_Rb1_2Bw75);
-
-    // The encryption key has to be the same as the one in the server
-    //uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-    //                    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
-    //rf69.setEncryptionKey(key);
-
-    pinMode(LED, OUTPUT);
-
-    Serial.print("RFM69 radio @");  Serial.print((int)RF69_FREQ);  Serial.println(" MHz");
-
-    /*! @brief rtl_433 output
-    *   Guessing modulation: Pulse Width Modulation with multiple packets
-    *   Attempting demodulation... short_width: 1228, long_width: 2484, reset_limit: 5180, sync_width: 0
-    *   Use a flex decoder with -X 'n=name,m=OOK_PWM,s=1228,l=2484,r=5180,g=2552,t=500,y=0'
-    *   pulse_demod_pwm(): Analyzer Device
-    *   bitbuffer:: Number of rows: 6
-    *   [00] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
-    *   [01] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
-    *   [02] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
-    *   [03] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
-    *   [04] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
-    *   [05] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
-    */
-    uint8_t data[4] = {0xFF, 0x9F, 0x3D, 0xC0};
-    rf69.send((uint8_t*)data, 4);
-
-    Serial.println("data sent");
+    if(radio.rf69_init(sizeof(sync_val), 4, sync_val, 2))
+        Serial.println("radio initialised");
 }
 
 void loop() {
-    if (rf69.waitAvailableTimeout(500)) {
-        // Should be a message for us now
-        uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
-        uint8_t len = sizeof(buf);
-
-        if (rf69.recv(buf, &len)) {
-            Serial.print("got reply: ");
-            Serial.println((char*)buf);
-        }
-        else
-            Serial.println("Receive failed");
-    }
-
-    uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-                      0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
-    rf69.send((uint8_t*)key, 16);
-    rf69.waitPacketSent();
-    delay(500);
-
-    // if (rf69.available()) {
-    //     // Should be a message for us now
-    //     uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
-    //     uint8_t len = sizeof(buf);
-    //     if (rf69.recv(buf, &len)) {
-    //     if (!len) return;
-    //     buf[len] = 0;
-    //     Serial.print("Received [");
-    //     Serial.print(len);
-    //     Serial.print("]: ");
-    //     Serial.println((char*)buf);
-    //     Serial.print("RSSI: ");
-    //     Serial.println(rf69.lastRssi(), DEC);
-
-    //     if (strstr((char *)buf, "Hello World")) {
-    //         // Send a reply!
-    //         uint8_t data[] = "And hello back to you";
-    //         rf69.send(data, sizeof(data));
-    //         rf69.waitPacketSent();
-    //         Serial.println("Sent a reply");
-    //         //Blink(LED, 40, 3); //blink LED 3 times, 40ms between blinks
-    //     }
-    //     } else {
-    //     Serial.println("Receive failed");
-    //     }
-    // }
+    radio.rf69_transmit(MED, 4, false);
+    delay(1000);
 }
 
 float measureBat() {

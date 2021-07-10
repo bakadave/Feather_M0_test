@@ -42,6 +42,6 @@ void setup() {
 }
 
 void loop() {
-    // radio.rf69_transmit(MED, 4, false);
-    // delay(1000);
+    radio.rf69_transmit(MED, 4, false);
+    delay(1000);
 }

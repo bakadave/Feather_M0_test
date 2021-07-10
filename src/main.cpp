@@ -9,9 +9,9 @@
 
 #define BAUDRATE 115200
 /* for feather m0  */
-#define RFM69_CS    8
-#define RFM69_INT   3
-#define RFM69_RST   4
+#define RF69_CS     8
+#define RF69_INT    3
+#define RF69_RST    4
 #define LED         13
 #define VBATPIN     A7
 
@@ -26,7 +26,7 @@ const uint8_t MED[] = {0x22, 0x0f, 0xe2, 0x00};
 // Singleton instance of the radio driver
 //
 //RH_RF69 rf69(RFM69_CS, RFM69_INT);
-Radio radio(RFM69_CS, RFM69_INT, RFM69_RST);
+Radio radio(RF69_CS, RF69_INT, RF69_RST);
 
 void setup() {
     Serial.begin(BAUDRATE);
@@ -34,8 +34,12 @@ void setup() {
         delay(1); // wait until serial console is open, remove if not tethered to computer
     Serial.println("serial started");
 
-    if(radio.rf69_init(sizeof(sync_val), 27, sync_val, 2))
-        Serial.println("radio initialised");
+    if(!radio.rf69_init(sizeof(sync_val), 27, sync_val, 2)) {
+        Serial.println("radio init failed");
+        while(1);
+    }
+
+    Serial.println("radio initialised");
 
     radio.rf69_transmit(MED, sizeof(MED), false);
     Serial.println("data sent");
@@ -43,5 +47,6 @@ void setup() {
 
 void loop() {
     radio.rf69_transmit(MED, 4, false);
+    Serial.println("data sent");
     delay(1000);
 }

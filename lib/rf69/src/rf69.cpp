@@ -15,29 +15,43 @@
  **/
 static SPISettings rf69_spi_settings(4000000, MSBFIRST, SPI_MODE0);
 
-Radio::Radio(uint8_t _pin_cs, uint8_t _pin_int, uint8_t _pin_rst) {
-    pin_cs = _pin_cs;
-    pin_int = _pin_int;
-    pin_rst = _pin_rst;
-}
 
-bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *sync_val, uint8_t sync_tol)
-{
+// Radio::Radio(uint8_t _pin_cs, uint8_t _pin_int, uint8_t _pin_rst) {
+//     pin_cs = _pin_cs;
+//     pin_int = _pin_int;
+//     pin_rst = _pin_rst;
+// }
+
+bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *sync_val, uint8_t sync_tol) {
 	pinMode(pin_rst, OUTPUT);
 	digitalWrite(pin_rst, LOW);
 
     //sync value of 0x00 is forbidden
     for(int i = 0; i < sync_len; i++) {
-        if(sync_val[i] == 0x00)
+        if(sync_val[i] == 0x00) {
+            Serial.println("illegal sync value");
             return false;
+        }
     }
 
+    // manual reset
+    digitalWrite(pin_rst, HIGH);
+    delay(10);
+    digitalWrite(pin_rst, LOW);
+    delay(10);
+
+    Serial.println("module reset, starting init");
+
 	if (!rf69.init()) {
+        Serial.println("rf69.init() failed");
 		return false;
 	}
-	rf69.setTxPower(20, true);
+    Serial.println("setting TX power");
+	rf69.setTxPower(14, true);
 
 	ATOMIC_BLOCK_START;
+
+    Serial.println("TX power set, checking module initialisation");
 
 	/* Ensure the module is initialised before we try to configure it: */
 	do {
@@ -49,17 +63,21 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
 	}
 	while (rf69.spiRead(RH_RF69_REG_2F_SYNCVALUE1) != 0x55);
 
+    Serial.println("module initialisation check pass");
+
 	rf69.setOpMode(RH_RF69_OPMODE_MODE_STDBY);
 
+    Serial.println("opmode set");
+
 	/* Initialize registers */
-	rf69.spiWrite(RH_RF69_REG_02_DATAMODUL,     RH_RF69_DATAMODUL_MODULATIONTYPE_OOK);  /* pakcet mode, FSK, no shaping */
+	rf69.spiWrite(RH_RF69_REG_02_DATAMODUL,     RH_RF69_DATAMODUL_MODULATIONTYPE_OOK);  /* pakcet mode, OOK, no shaping */
 	rf69.spiWrite(RH_RF69_REG_03_BITRATEMSB,    0x7d);
 	rf69.spiWrite(RH_RF69_REG_04_BITRATELSB,    0x00);  /* bit rate - 1000bps */
 	rf69.spiWrite(RH_RF69_REG_05_FDEVMSB,       0x01);
 	rf69.spiWrite(RH_RF69_REG_06_FDEVLSB,       0x9a);  /* frequency deviation - 25Khz */
-	rf69.spiWrite(RH_RF69_REG_07_FRFMSB,        0x37);
-	rf69.spiWrite(RH_RF69_REG_08_FRFMID,        0xe9);
-	rf69.spiWrite(RH_RF69_REG_09_FRFLSB,        0x2e);  /* Approx 868.1Mhz */
+	rf69.spiWrite(RH_RF69_REG_07_FRFMSB,        0xd9);
+	rf69.spiWrite(RH_RF69_REG_08_FRFMID,        0x06);
+	rf69.spiWrite(RH_RF69_REG_09_FRFLSB,        0x66);  /* Approx 868.1Mhz */
     //rf69.setFrequency(868.1);
 	rf69.spiWrite(RH_RF69_REG_19_RXBW,          0x42);
 	rf69.spiWrite(RH_RF69_REG_37_PACKETCONFIG1, RH_RF69_PACKETCONFIG1_DCFREE_NONE);  /* No packet filtering */
@@ -73,15 +91,19 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
 		rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1 + i, sync_val[i]);
 	}
 
+    Serial.println("sync val set");
+
 	/* Using fixed packet size for receive: */
 	rf69.spiWrite(RH_RF69_REG_38_PAYLOADLENGTH, recv_packet_len);
 	rf69.spiWrite(RH_RF69_REG_3C_FIFOTHRESH,    RH_RF69_FIFOTHRESH_TXSTARTCONDITION_NOTEMPTY);  /* transmit as soon as FIFO non-empty */
 	rf69.spiWrite(RH_RF69_REG_6F_TESTDAGC,      RH_RF69_TESTDAGC_CONTINUOUSDAGC_IMPROVED_LOWBETAON);
 
+    Serial.println("starting receive mode");
 	/* Start in receive mode */
 	rf69.setOpMode(RH_RF69_OPMODE_MODE_RX);
 	ATOMIC_BLOCK_END;
 
+    Serial.println("init done");
 	return true;
 }
 

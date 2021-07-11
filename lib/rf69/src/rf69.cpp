@@ -58,20 +58,20 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
 		rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1, 0xaa);
 	}
 	while (rf69.spiRead(RH_RF69_REG_2F_SYNCVALUE1) != 0xaa);
-	do {
-		rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1, 0x55);
-	}
+    do {
+        rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1, 0x55);
+    }
 	while (rf69.spiRead(RH_RF69_REG_2F_SYNCVALUE1) != 0x55);
 
     Serial.println("module initialisation check pass");
 
 	rf69.setOpMode(RH_RF69_OPMODE_MODE_STDBY);
+    rf69.setOpMode(RH_RF69_OPMODE_SEQUENCEROFF);
 
     Serial.println("opmode set");
 
 	/* Initialize registers */
-    //rf69.spiWrite()
-	rf69.spiWrite(RH_RF69_REG_02_DATAMODUL,     RH_RF69_DATAMODUL_MODULATIONTYPE_OOK | RH_RF69_DATAMODUL_MODULATIONSHAPING_OOK_NONE);  /* pakcet mode, OOK, no shaping */
+	rf69.spiWrite(RH_RF69_REG_02_DATAMODUL,     RH_RF69_DATAMODUL_DATAMODE_CONT_WITHOUT_SYNC | RH_RF69_DATAMODUL_MODULATIONTYPE_OOK | RH_RF69_DATAMODUL_MODULATIONSHAPING_OOK_NONE);  /* pakcet mode, OOK, no shaping */
 
 //BITRATE
     uint32_t bitrate = RH_RF69_FXOSC / 3000;
@@ -99,15 +99,13 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
     rf69.spiWrite(RH_RF69_REG_37_PACKETCONFIG1, RH_RF69_PACKETCONFIG1_DCFREE_NONE);  /* No packet filtering */
 	rf69.spiWrite(RH_RF69_REG_28_IRQFLAGS2,     RH_RF69_IRQFLAGS2_FIFOOVERRUN);  /* Clear FIFO and flags */
 	rf69.spiWrite(RH_RF69_REG_2D_PREAMBLELSB,   0x00);  /* We generate our own preamble */
-
-    rf69.spiWrite(RH_RF69_REG_2E_SYNCCONFIG,
-		(1 << 7) /* sync on */ | ((sync_len - 1) << 3) /* 6 bytes */ | sync_tol /* error tolerance of 2 */
-	);
-	for (uint16_t i = 0; i < sync_len; i++) {
-		rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1 + i, sync_val[i]);
-	}
-
-    Serial.println("sync val set");
+//SYNC VAL
+    // rf69.spiWrite(RH_RF69_REG_2E_SYNCCONFIG,
+	// 	(1 << 7) /* sync on */ | ((sync_len - 1) << 3) /* 6 bytes */ | sync_tol /* error tolerance of 2 */
+	// );
+	// for (uint16_t i = 0; i < sync_len; i++) {
+	// 	rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1 + i, sync_val[i]);
+	// }
 
 	/* Using fixed packet size for receive: */
 	rf69.spiWrite(RH_RF69_REG_38_PAYLOADLENGTH, recv_packet_len);

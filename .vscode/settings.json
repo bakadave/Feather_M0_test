@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.json": "jsonc",
+        "array": "cpp",
+        "string": "cpp",
+        "string_view": "cpp"
+    }
+}

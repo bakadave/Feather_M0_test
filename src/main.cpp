@@ -56,7 +56,7 @@ void setup() {
     rf69.setTxPower(14, true);  // range from 14-20 for power, 2nd arg must be true for 69HCW
 
     //rf69.setModemRegisters(FSK_Rb38_4Fd76_8);
-    rf69.setModemConfig(RH_RF69::OOK_Rb9_6Bw19_2);
+    rf69.setModemConfig(RH_RF69::OOK_Rb2_4Bw4_8);
 
     // The encryption key has to be the same as the one in the server
     //uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
@@ -88,12 +88,14 @@ void setup() {
 
 void loop() {
     uint8_t data[] = {0x22, 0x0F, 0xe2};
-    //for(int i = 0; i < 5; i++) {
-        rf69.send((uint8_t*)data, sizeof(data));
+    uint8_t MED[] = {0x84,0x3c,0x84,0x21,0xe4,0x21,0x08,0x43,0xcf,0x79,0xe7,0x9e,0x79,0x08,0x43,0xc8};
+    for(int i = 0; i < 5; i++) {
+        rf69.send((uint8_t*)MED, sizeof(MED));
         rf69.waitPacketSent();
-    //}
+        delay(50);
+    }
     Serial.println("data sent");
-    delay(1000);
+    delay(5000);
 
     // if (rf69.available()) {
     //     // Should be a message for us now

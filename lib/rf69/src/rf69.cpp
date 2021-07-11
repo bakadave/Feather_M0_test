@@ -71,10 +71,10 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
     Serial.println("opmode set");
 
 	/* Initialize registers */
-	rf69.spiWrite(RH_RF69_REG_02_DATAMODUL,     RH_RF69_DATAMODUL_DATAMODE_CONT_WITHOUT_SYNC | RH_RF69_DATAMODUL_MODULATIONTYPE_OOK | RH_RF69_DATAMODUL_MODULATIONSHAPING_OOK_NONE);  /* pakcet mode, OOK, no shaping */
+	rf69.spiWrite(RH_RF69_REG_02_DATAMODUL,     /*RH_RF69_DATAMODUL_DATAMODE_CONT_WITHOUT_SYNC | */RH_RF69_DATAMODUL_MODULATIONTYPE_OOK | RH_RF69_DATAMODUL_MODULATIONSHAPING_OOK_NONE);  /* pakcet mode, OOK, no shaping */
 
 //BITRATE
-    uint32_t bitrate = RH_RF69_FXOSC / 3000;
+    uint32_t bitrate = RH_RF69_FXOSC / 3800;
 	rf69.spiWrite(RH_RF69_REG_03_BITRATEMSB,    bitrate >> 8);
 	rf69.spiWrite(RH_RF69_REG_04_BITRATELSB,    bitrate);
 
@@ -82,7 +82,7 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
 	// rf69.spiWrite(RH_RF69_REG_06_FDEVLSB,       0x9a);  /* frequency deviation - 25Khz */
 
 //FREQUENCY
-    uint32_t freqHz = 868100000;
+    uint32_t freqHz = 868112500;
     freqHz /= RH_RF69_FSTEP;
 	rf69.spiWrite(RH_RF69_REG_07_FRFMSB,        freqHz >> 16);
 	rf69.spiWrite(RH_RF69_REG_08_FRFMID,        freqHz >> 8);
@@ -90,7 +90,9 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
     //rf69.setFrequency(868.1);
 
 //BANDWIDTH
-    //uint8_t bw = 0x00;
+    //uint8_t bw = 0x15;  /* 5.2 kHz*/
+    //uint8_t bw = 0x00;  /* 250 kHz*/
+    //uint8_t bw = 0x15;
 	//rf69.spiWrite(RH_RF69_REG_19_RXBW,          (rf69.spiRead(RH_RF69_REG_19_RXBW) & 0xE0) | bw);
 
 //THRESHOLD
@@ -100,12 +102,12 @@ bool Radio::rf69_init(uint8_t sync_len, uint8_t recv_packet_len, const uint8_t *
 	rf69.spiWrite(RH_RF69_REG_28_IRQFLAGS2,     RH_RF69_IRQFLAGS2_FIFOOVERRUN);  /* Clear FIFO and flags */
 	rf69.spiWrite(RH_RF69_REG_2D_PREAMBLELSB,   0x00);  /* We generate our own preamble */
 //SYNC VAL
-    // rf69.spiWrite(RH_RF69_REG_2E_SYNCCONFIG,
-	// 	(1 << 7) /* sync on */ | ((sync_len - 1) << 3) /* 6 bytes */ | sync_tol /* error tolerance of 2 */
-	// );
-	// for (uint16_t i = 0; i < sync_len; i++) {
-	// 	rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1 + i, sync_val[i]);
-	// }
+    rf69.spiWrite(RH_RF69_REG_2E_SYNCCONFIG,
+		(1 << 7) /* sync on */ | ((sync_len - 1) << 3) /* 6 bytes */ | sync_tol /* error tolerance of 2 */
+	);
+	for (uint16_t i = 0; i < sync_len; i++) {
+		rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1 + i, sync_val[i]);
+	}
 
 	/* Using fixed packet size for receive: */
 	rf69.spiWrite(RH_RF69_REG_38_PAYLOADLENGTH, recv_packet_len);

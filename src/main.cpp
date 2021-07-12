@@ -19,14 +19,25 @@
 // 862 - 890 MHz
 #define FREQ 868.1
 
+#define BAUDRATE 115200
+
+//const uint8_t sync_val[] = {0x00};
+//const uint8_t sync_val[] = { 0x6c, 0xb6, 0xcb, 0x2c, 0x92, 0xd9 };
+const uint8_t sync_val[] = {0x01};
+const uint8_t sync_tol = 0x02;
+const uint8_t recv_packet_len = 2;
+//const uint8_t MED[] = {0x22, 0x0f, 0xe2, 0x00};
+//const uint8_t MED[] = {0x84,0x3c,0x84,0x21,0xe4,0x21,0x08,0x43,0xcf,0x79,0xe7,0x9e,0x79,0x08,0x43,0xc8, 0x04};
+const uint8_t preamb[] = {0x01,0x00,0x00,0x00,0x00};
+const uint8_t _MED[] = {0x00,0x00,0x00,0x00,0x84,0x3c,0x84,0x21,0xe4,0x21,0x08,0x43,0xcf,0x79,0xe7,0x9e,0x79,0x08,0x43,0xc8,0x40};
+const uint8_t MED[] = {0x84,0x3c,0x84,0x21,0xe4,0x21,0x08,0x43,0xcf,0x79,0xe7,0x9e,0x79,0x08,0x43,0xc8,0x40};
+
 // Singleton instance of the radio driver
 //
 RH_RF69 rf69(RFM69_CS, RFM69_INT);
 
-float measureBat();
-
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(BAUDRATE);
     while (!Serial)
         delay(1); // wait until serial console is open, remove if not tethered to computer
 
@@ -44,91 +55,114 @@ void setup() {
         Serial.println("RFM69 radio init failed");
         while (1);
     }
-    Serial.println("RFM69 radio init OK!");
-
-    // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM (for low power module)
-    // No encryption
-    if (!rf69.setFrequency(FREQ))
-        Serial.println("setFrequency failed");
 
     // If you are using a high power RF69 eg RFM69HW, you *must* set a Tx power with the
     // ishighpowermodule flag set like this:
     rf69.setTxPower(14, true);  // range from 14-20 for power, 2nd arg must be true for 69HCW
 
-    //rf69.setModemRegisters(FSK_Rb38_4Fd76_8);
-    rf69.setModemConfig(RH_RF69::OOK_Rb2_4Bw4_8);
+    ATOMIC_BLOCK_START;
 
-    // The encryption key has to be the same as the one in the server
-    //uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-    //                    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
-    //rf69.setEncryptionKey(key);
+    /* Ensure the module is initialised before we try to configure it: */
+    do {
+		rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1, 0xaa);
+	}
+	while (rf69.spiRead(RH_RF69_REG_2F_SYNCVALUE1) != 0xaa);
+    do {
+        rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1, 0x55);
+    }
+	while (rf69.spiRead(RH_RF69_REG_2F_SYNCVALUE1) != 0x55);
 
-    pinMode(LED, OUTPUT);
+    rf69.setOpMode(RH_RF69_OPMODE_MODE_STDBY);
+    rf69.setOpMode(RH_RF69_OPMODE_SEQUENCEROFF);
 
-    Serial.print("RFM69 radio @");  Serial.print((int)FREQ);  Serial.println(" MHz");
+    /* Initialize registers */
+	rf69.spiWrite(RH_RF69_REG_02_DATAMODUL,     /*RH_RF69_DATAMODUL_DATAMODE_CONT_WITHOUT_SYNC | */RH_RF69_DATAMODUL_MODULATIONTYPE_OOK | RH_RF69_DATAMODUL_MODULATIONSHAPING_OOK_NONE);  /* pakcet mode, OOK, no shaping */
 
-    /*! @brief rtl_433 output
-    *   Guessing modulation: Pulse Width Modulation with multiple packets
-    *   Attempting demodulation... short_width: 1228, long_width: 2484, reset_limit: 5180, sync_width: 0
-    *   Use a flex decoder with -X 'n=name,m=OOK_PWM,s=1228,l=2484,r=5180,g=2552,t=500,y=0'
-    *   pulse_demod_pwm(): Analyzer Device
-    *   bitbuffer:: Number of rows: 6
-    *   [00] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
-    *   [01] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
-    *   [02] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
-    *   [03] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
-    *   [04] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
-    *   [05] {27} ff 9f 3d c0 : 11111111 10011111 00111101 110
-    */
-    uint8_t data[4] = {0xFF, 0x9F, 0x3D, 0xC0};
-    rf69.send((uint8_t*)data, 4);
+//BITRATE
+    uint32_t bitrate = RH_RF69_FXOSC / 3800;
+	rf69.spiWrite(RH_RF69_REG_03_BITRATEMSB,    bitrate >> 8);
+	rf69.spiWrite(RH_RF69_REG_04_BITRATELSB,    bitrate);
 
-    Serial.println("data sent");
+	// rf69.spiWrite(RH_RF69_REG_05_FDEVMSB,       0x01);
+	// rf69.spiWrite(RH_RF69_REG_06_FDEVLSB,       0x9a);  /* frequency deviation - 25Khz */
+
+//FREQUENCY
+    uint32_t freqHz = 868112500;
+    freqHz /= RH_RF69_FSTEP;
+	rf69.spiWrite(RH_RF69_REG_07_FRFMSB,        freqHz >> 16);
+	rf69.spiWrite(RH_RF69_REG_08_FRFMID,        freqHz >> 8);
+	rf69.spiWrite(RH_RF69_REG_09_FRFLSB,        freqHz);
+    //rf69.setFrequency(868.1);
+
+//BANDWIDTH
+    //uint8_t bw = 0x15;  /* 5.2 kHz*/
+    //uint8_t bw = 0x00;  /* 250 kHz*/
+    //uint8_t bw = 0x15;
+	//rf69.spiWrite(RH_RF69_REG_19_RXBW,          (rf69.spiRead(RH_RF69_REG_19_RXBW) & 0xE0) | bw);
+
+//THRESHOLD
+    rf69.spiWrite(RH_RF69_REG_1D_OOKFIX,        30);
+
+    rf69.spiWrite(RH_RF69_REG_37_PACKETCONFIG1, RH_RF69_PACKETCONFIG1_DCFREE_NONE);  /* No packet filtering */
+	rf69.spiWrite(RH_RF69_REG_28_IRQFLAGS2,     RH_RF69_IRQFLAGS2_FIFOOVERRUN);  /* Clear FIFO and flags */
+	rf69.spiWrite(RH_RF69_REG_2D_PREAMBLELSB,   0x00);  /* We generate our own preamble */
+
+//SYNC VAL
+    rf69.spiWrite(RH_RF69_REG_2E_SYNCCONFIG,
+		(1 << 7) /* sync on */ | ((sizeof(sync_val) - 1) << 3) /* 6 bytes */ | sync_tol /* error tolerance of 2 */
+	);
+	for (uint16_t i = 0; i < sizeof(sync_val); i++) {
+		rf69.spiWrite(RH_RF69_REG_2F_SYNCVALUE1 + i, sync_val[i]);
+	}
+
+    /* Using fixed packet size for receive: */
+	rf69.spiWrite(RH_RF69_REG_38_PAYLOADLENGTH, recv_packet_len);
+	rf69.spiWrite(RH_RF69_REG_3C_FIFOTHRESH,    RH_RF69_FIFOTHRESH_TXSTARTCONDITION_NOTEMPTY);  /* transmit as soon as FIFO non-empty */
+	rf69.spiWrite(RH_RF69_REG_6F_TESTDAGC,      RH_RF69_TESTDAGC_CONTINUOUSDAGC_IMPROVED_LOWBETAON);
+
+    Serial.println("starting receive mode");
+	/* Start in receive mode */
+	rf69.setOpMode(RH_RF69_OPMODE_MODE_RX);
+	ATOMIC_BLOCK_END;
+
+    Serial.println("init done");
 }
 
 void loop() {
-    uint8_t data[] = {0x22, 0x0F, 0xe2};
-    uint8_t MED[] = {0x84,0x3c,0x84,0x21,0xe4,0x21,0x08,0x43,0xcf,0x79,0xe7,0x9e,0x79,0x08,0x43,0xc8};
-    for(int i = 0; i < 5; i++) {
+    rf69.send((uint8_t*)_MED, sizeof(_MED));
+    for(int i = 0; i < 3; i++) {
+        delay(8);
         rf69.send((uint8_t*)MED, sizeof(MED));
         rf69.waitPacketSent();
-        delay(50);
     }
     Serial.println("data sent");
-    delay(5000);
+    //delay(5000);
 
-    // if (rf69.available()) {
-    //     // Should be a message for us now
-    //     uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
-    //     uint8_t len = sizeof(buf);
-    //     if (rf69.recv(buf, &len)) {
-    //     if (!len) return;
-    //     buf[len] = 0;
-    //     Serial.print("Received [");
-    //     Serial.print(len);
-    //     Serial.print("]: ");
-    //     Serial.println((char*)buf);
-    //     Serial.print("RSSI: ");
-    //     Serial.println(rf69.lastRssi(), DEC);
+    if (rf69.available()) {
+        // Should be a message for us now
+        uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
+        uint8_t len = sizeof(buf);
+        if (rf69.recv(buf, &len)) {
+        if (!len) return;
+        buf[len] = 0;
+        Serial.print("Received [");
+        Serial.print(len);
+        Serial.print("]: ");
+        Serial.println((char*)buf);
+        Serial.print("RSSI: ");
+        Serial.println(rf69.lastRssi(), DEC);
 
-    //     if (strstr((char *)buf, "Hello World")) {
-    //         // Send a reply!
-    //         uint8_t data[] = "And hello back to you";
-    //         rf69.send(data, sizeof(data));
-    //         rf69.waitPacketSent();
-    //         Serial.println("Sent a reply");
-    //         //Blink(LED, 40, 3); //blink LED 3 times, 40ms between blinks
-    //     }
-    //     } else {
-    //     Serial.println("Receive failed");
-    //     }
-    // }
-}
-
-float measureBat() {
-    float measuredvbat = analogRead(VBATPIN);
-    measuredvbat *= 2;    // we divided by 2, so multiply back
-    measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
-    measuredvbat /= 1024; // convert to voltage
-    return measuredvbat;
+        if (strstr((char *)buf, "Hello World")) {
+            // Send a reply!
+            uint8_t data[] = "And hello back to you";
+            rf69.send(data, sizeof(data));
+            rf69.waitPacketSent();
+            Serial.println("Sent a reply");
+            //Blink(LED, 40, 3); //blink LED 3 times, 40ms between blinks
+        }
+        } else {
+        Serial.println("Receive failed");
+        }
+    }
+    delay(500);
 }

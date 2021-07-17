@@ -17,7 +17,7 @@
 #define VBATPIN     A7
 
 // 862 - 890 MHz
-#define FREQ 868.1
+#define FREQ 868.1125
 
 #define BAUDRATE 115200
 
@@ -87,7 +87,7 @@ void setup() {
 	// rf69.spiWrite(RH_RF69_REG_06_FDEVLSB,       0x9a);  /* frequency deviation - 25Khz */
 
 //FREQUENCY
-    uint32_t freqHz = 868112500;
+    uint32_t freqHz = FREQ * 1000000;
     freqHz /= RH_RF69_FSTEP;
 	rf69.spiWrite(RH_RF69_REG_07_FRFMSB,        freqHz >> 16);
 	rf69.spiWrite(RH_RF69_REG_08_FRFMID,        freqHz >> 8);
@@ -120,12 +120,14 @@ void setup() {
 	rf69.spiWrite(RH_RF69_REG_3C_FIFOTHRESH,    RH_RF69_FIFOTHRESH_TXSTARTCONDITION_NOTEMPTY);  /* transmit as soon as FIFO non-empty */
 	rf69.spiWrite(RH_RF69_REG_6F_TESTDAGC,      RH_RF69_TESTDAGC_CONTINUOUSDAGC_IMPROVED_LOWBETAON);
 
+    //rf69.setPromiscuous(true);
+
     Serial.println("starting receive mode");
 	/* Start in receive mode */
 	rf69.setOpMode(RH_RF69_OPMODE_MODE_RX);
 	ATOMIC_BLOCK_END;
 
-    Serial.println("init done");
+    Serial.println("Szia uram!");
 }
 
 void loop() {

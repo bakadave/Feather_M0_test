@@ -17,11 +17,11 @@
 #define VBATPIN     A7
 
 // 862 - 890 MHz
-#define FREQ 868.1125
+#define FREQ 868.1
 
 #define BAUDRATE 115200
+#define PACKET_LENGTH
 
-//const uint8_t sync_val[] = {0x00};
 //const uint8_t sync_val[] = { 0x6c, 0xb6, 0xcb, 0x2c, 0x92, 0xd9 };
 const uint8_t sync_val[] = {0x01};
 const uint8_t sync_tol = 0x02;
@@ -31,6 +31,9 @@ const uint8_t recv_packet_len = 2;
 const uint8_t preamb[] = {0x01,0x00,0x00,0x00,0x00};
 const uint8_t _MED[] = {0x00,0x00,0x00,0x00,0x84,0x3c,0x84,0x21,0xe4,0x21,0x08,0x43,0xcf,0x79,0xe7,0x9e,0x79,0x08,0x43,0xc8,0x40};
 const uint8_t MED[] = {0x84,0x3c,0x84,0x21,0xe4,0x21,0x08,0x43,0xcf,0x79,0xe7,0x9e,0x79,0x08,0x43,0xc8,0x40};
+static SPISettings rf69_spi_settings(4000000, MSBFIRST, SPI_MODE0);
+
+void rf69_transmit(const uint8_t *data, size_t len, bool no_sync);
 
 // Singleton instance of the radio driver
 //
@@ -87,8 +90,7 @@ void setup() {
 	// rf69.spiWrite(RH_RF69_REG_06_FDEVLSB,       0x9a);  /* frequency deviation - 25Khz */
 
 //FREQUENCY
-    uint32_t freqHz = FREQ * 1000000;
-    freqHz /= RH_RF69_FSTEP;
+    uint32_t freqHz = FREQ * 1000000 / RH_RF69_FSTEP;
 	rf69.spiWrite(RH_RF69_REG_07_FRFMSB,        freqHz >> 16);
 	rf69.spiWrite(RH_RF69_REG_08_FRFMID,        freqHz >> 8);
 	rf69.spiWrite(RH_RF69_REG_09_FRFLSB,        freqHz);
@@ -131,11 +133,10 @@ void setup() {
 }
 
 void loop() {
-    rf69.send((uint8_t*)_MED, sizeof(_MED));
+    rf69_transmit((uint8_t*)_MED, sizeof(_MED), false);
     for(int i = 0; i < 3; i++) {
         delay(8);
-        rf69.send((uint8_t*)MED, sizeof(MED));
-        rf69.waitPacketSent();
+        rf69_transmit((uint8_t*)MED, sizeof(MED), true);
     }
     Serial.println("data sent");
     //delay(5000);
@@ -167,4 +168,49 @@ void loop() {
         }
     }
     delay(500);
+}
+
+void rf69_transmit(const uint8_t *data, size_t len, bool no_sync) {
+    uint8_t orig_payload_len, orig_syncconf = 0, pos;
+
+	ATOMIC_BLOCK_START;
+	/* Clear any current receive in progress */
+	rf69.setOpMode(RH_RF69_OPMODE_MODE_STDBY);
+	rf69.spiWrite(RH_RF69_REG_28_IRQFLAGS2, RH_RF69_IRQFLAGS2_FIFOOVERRUN);  /* Clear FIFO and flags */
+
+	/* Disable sync word? */
+	if (no_sync) {
+		orig_syncconf = rf69.spiRead(RH_RF69_REG_2E_SYNCCONFIG);
+		rf69.spiWrite(RH_RF69_REG_2E_SYNCCONFIG, RH_RF69_SYNCCONFIG_SYNCSIZE_1);
+	}
+
+	/* Populate the FIFO with the data.  We assume len < size of fifo (66
+	* bytes) */
+	orig_payload_len = rf69.spiRead(RH_RF69_REG_38_PAYLOADLENGTH);
+	rf69.spiWrite(RH_RF69_REG_38_PAYLOADLENGTH, len);
+	SPI.beginTransaction(rf69_spi_settings);
+	digitalWrite(RFM69_CS, LOW);
+	SPI.transfer(RH_RF69_REG_00_FIFO | RH_RF69_SPI_WRITE_MASK);
+	for (pos = 0; pos < len; pos++) {
+		SPI.transfer(data[pos]);
+	}
+	digitalWrite(RFM69_CS, HIGH);
+	SPI.endTransaction();
+
+	/* Transition to transmit state, then poll for transmission complete */
+	rf69.setOpMode(RH_RF69_OPMODE_MODE_TX);
+	while (!(rf69.spiRead(RH_RF69_REG_28_IRQFLAGS2) & 8 /* PacketSent */)) {
+		delay(100);
+	}
+
+	/* Re-enable sync word? */
+	if (no_sync) {
+		rf69.setOpMode(RH_RF69_OPMODE_MODE_STDBY);
+		rf69.spiWrite(RH_RF69_REG_2E_SYNCCONFIG, orig_syncconf);
+	}
+
+	/* Now back to receive mode */
+	rf69.spiWrite(RH_RF69_REG_38_PAYLOADLENGTH, orig_payload_len);
+	rf69.setOpMode(RH_RF69_OPMODE_MODE_RX);
+	ATOMIC_BLOCK_END;
 }
